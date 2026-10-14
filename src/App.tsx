@@ -11,6 +11,7 @@ import {
   MEALS_CONFIG, 
   INITIAL_USER_STATS,
   INITIAL_MEDICATIONS,
+  MAX_SAFE_CAFFEINE_MG,
   FoodItem, 
   MealFoodItem, 
   UserStats, 
@@ -19,7 +20,29 @@ import {
   WeightEntry
 } from './data/tacoDatabase';
 
+const STORAGE_VERSION_TAG = 'bodymonitor_routine_v3';
+
 export function App() {
+  // Garantir migração inicial para a nova rotina personalizada do Felipe
+  if (typeof window !== 'undefined') {
+    const isV3 = localStorage.getItem(STORAGE_VERSION_TAG) === 'true';
+    if (!isV3) {
+      localStorage.setItem('bodymonitor_foods', JSON.stringify(INITIAL_FOODS));
+      localStorage.setItem('bodymonitor_meds', JSON.stringify(INITIAL_MEDICATIONS));
+      
+      const currentMealsStr = localStorage.getItem('bodymonitor_meals');
+      const parsedMeals = currentMealsStr ? JSON.parse(currentMealsStr) : {};
+      parsedMeals.cafe = parsedMeals.cafe || [];
+      parsedMeals.almoco = parsedMeals.almoco || [];
+      parsedMeals.lanche = parsedMeals.lanche || [];
+      parsedMeals.jantar = parsedMeals.jantar || [];
+      parsedMeals.ceia = parsedMeals.ceia || [];
+      localStorage.setItem('bodymonitor_meals', JSON.stringify(parsedMeals));
+      
+      localStorage.setItem(STORAGE_VERSION_TAG, 'true');
+    }
+  }
+
   // Aba ativa de navegação mobile
   const [activeTab, setActiveTab] = useState<'meals' | 'water_coffee' | 'meds' | 'weight'>('meals');
 
@@ -43,11 +66,22 @@ export function App() {
 
   const [meals, setMeals] = useState<Record<string, MealFoodItem[]>>(() => {
     const saved = localStorage.getItem('bodymonitor_meals');
-    return saved ? JSON.parse(saved) : {
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        cafe: parsed.cafe || [],
+        almoco: parsed.almoco || [],
+        lanche: parsed.lanche || [],
+        jantar: parsed.jantar || [],
+        ceia: parsed.ceia || []
+      };
+    }
+    return {
       cafe: [],
       almoco: [],
       lanche: [],
-      jantar: []
+      jantar: [],
+      ceia: []
     };
   });
 
@@ -57,20 +91,20 @@ export function App() {
     return saved ? JSON.parse(saved) : 500;
   });
 
-  // 5. Monitor de Café & Cafeína
-  const [coffeeCups, setCoffeeCups] = useState<number>(() => {
-    const saved = localStorage.getItem('bodymonitor_coffee_cups');
-    return saved ? JSON.parse(saved) : 2;
+  // 5. Monitor de Café & Cafeína discriminado por copos plásticos (50ml e 200ml)
+  const [coffeeSmallCups, setCoffeeSmallCups] = useState<number>(() => {
+    const saved = localStorage.getItem('bodymonitor_coffee_small_cups');
+    return saved ? JSON.parse(saved) : 0;
   });
-  const [coffeeLimit, setCoffeeLimit] = useState<number>(() => {
-    const saved = localStorage.getItem('bodymonitor_coffee_limit');
-    return saved ? JSON.parse(saved) : 3;
+  const [coffeeLargeCups, setCoffeeLargeCups] = useState<number>(() => {
+    const saved = localStorage.getItem('bodymonitor_coffee_large_cups');
+    return saved ? JSON.parse(saved) : 0;
   });
   const [lastCoffeeTime, setLastCoffeeTime] = useState<string | null>(() => {
     return localStorage.getItem('bodymonitor_last_coffee') || null;
   });
 
-  // 6. Checklist de Remédios & Suplementos
+  // 6. Checklist de Remédios (Omeprazol e Olmesartana às 08:00)
   const [medications, setMedications] = useState<MedicationItem[]>(() => {
     const saved = localStorage.getItem('bodymonitor_meds');
     return saved ? JSON.parse(saved) : INITIAL_MEDICATIONS;
@@ -99,7 +133,7 @@ export function App() {
 
   // Form novo alimento
   const [newFood, setNewFood] = useState({
-    name: '', portion: '100g', calories: '', protein: '', carbs: '', fat: '', category: 'Personalizado'
+    name: '', portion: '1 porção', calories: '', protein: '', carbs: '', fat: '', category: 'Personalizado'
   });
 
   // Form novo remédio
@@ -113,8 +147,8 @@ export function App() {
   useEffect(() => { localStorage.setItem('bodymonitor_foods', JSON.stringify(foodsList)); }, [foodsList]);
   useEffect(() => { localStorage.setItem('bodymonitor_meals', JSON.stringify(meals)); }, [meals]);
   useEffect(() => { localStorage.setItem('bodymonitor_water_ml', JSON.stringify(waterMl)); }, [waterMl]);
-  useEffect(() => { localStorage.setItem('bodymonitor_coffee_cups', JSON.stringify(coffeeCups)); }, [coffeeCups]);
-  useEffect(() => { localStorage.setItem('bodymonitor_coffee_limit', JSON.stringify(coffeeLimit)); }, [coffeeLimit]);
+  useEffect(() => { localStorage.setItem('bodymonitor_coffee_small_cups', JSON.stringify(coffeeSmallCups)); }, [coffeeSmallCups]);
+  useEffect(() => { localStorage.setItem('bodymonitor_coffee_large_cups', JSON.stringify(coffeeLargeCups)); }, [coffeeLargeCups]);
   useEffect(() => {
     if (lastCoffeeTime) {
       localStorage.setItem('bodymonitor_last_coffee', lastCoffeeTime);
@@ -130,7 +164,7 @@ export function App() {
 
   // Meta hídrica recomendada: 35ml por kg corporal (75kg * 35ml = 2625ml)
   const waterGoalMl = useMemo(() => {
-    const w = parseFloat(userStats.weight as any) || 75;
+    const w = parseFloat(userStats.weight as unknown as string) || 75;
     return Math.round(w * 35);
   }, [userStats.weight]);
 
@@ -145,18 +179,43 @@ export function App() {
     });
   };
 
-  // Registro de Café
-  const handleAddCoffee = (cupsToAdd: number) => {
-    const next = Math.max(0, coffeeCups + cupsToAdd);
-    setCoffeeCups(next);
-    const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    setLastCoffeeTime(nowTime);
+  // Cálculos de Café e Cafeína
+  // Copinho pequeno de café: 50 ml (~40 mg de cafeína)
+  // Copo plástico comum: 200 ml (~160 mg de cafeína)
+  const totalCoffeeMl = useMemo(() => {
+    return (coffeeSmallCups * 50) + (coffeeLargeCups * 200);
+  }, [coffeeSmallCups, coffeeLargeCups]);
 
-    if (next >= coffeeLimit) {
-      showToast(`☕ Você atingiu o limite de ${coffeeLimit} cafés hoje!`);
-    } else {
-      showToast(`Café registrado às ${nowTime}!`);
+  const totalCaffeineMg = useMemo(() => {
+    return (coffeeSmallCups * 40) + (coffeeLargeCups * 160);
+  }, [coffeeSmallCups, coffeeLargeCups]);
+
+  const caffeinePct = Math.min(100, Math.round((totalCaffeineMg / MAX_SAFE_CAFFEINE_MG) * 100));
+
+  const handleAddSmallCoffee = (delta: number) => {
+    const next = Math.max(0, coffeeSmallCups + delta);
+    setCoffeeSmallCups(next);
+    if (delta > 0) {
+      const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      setLastCoffeeTime(nowTime);
+      showToast(`+1 Copinho (50ml) registrado às ${nowTime}!`);
     }
+  };
+
+  const handleAddLargeCoffee = (delta: number) => {
+    const next = Math.max(0, coffeeLargeCups + delta);
+    setCoffeeLargeCups(next);
+    if (delta > 0) {
+      const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      setLastCoffeeTime(nowTime);
+      showToast(`+1 Copo Comum (200ml) registrado às ${nowTime}!`);
+    }
+  };
+
+  const handleResetCoffee = () => {
+    setCoffeeSmallCups(0);
+    setCoffeeLargeCups(0);
+    showToast('Consumo de café zerado para hoje!');
   };
 
   // Checklist de Remédios
@@ -178,41 +237,101 @@ export function App() {
       id: `med_${Date.now()}`,
       name: newMed.name.trim(),
       dosage: newMed.dosage.trim() || '1 comprimido',
-      scheduledTime: newMed.scheduledTime.trim() || 'Horário livre',
+      scheduledTime: newMed.scheduledTime.trim() || '08:00',
       takenToday: false
     };
     setMedications(prev => [...prev, item]);
-    setIsAddMedModalOpen(false);
     setNewMed({ name: '', dosage: '1 comprimido', scheduledTime: '08:00' });
-    showToast('Remédio adicionado ao seu checklist!');
+    setIsAddMedModalOpen(false);
+    showToast('Medicamento adicionado ao checklist!');
+  };
+
+  const handleRemoveMedication = (id: string) => {
+    setMedications(prev => prev.filter(m => m.id !== id));
+    showToast('Medicamento removido.');
   };
 
   const handleResetDailyMeds = () => {
-    if (window.confirm('Deseja desmarcar todos os remédios para iniciar um novo dia?')) {
-      setMedications(prev => prev.map(m => ({ ...m, takenToday: false, takenAt: undefined })));
-      showToast('Checklist reiniciado para hoje!');
-    }
+    setMedications(prev => prev.map(m => ({ ...m, takenToday: false, takenAt: undefined })));
+    showToast('Checklist de remédios resetado para hoje!');
   };
 
-  // Registro de Pesagem (75kg -> 65kg)
+  // Alimentos das Refeições
+  const handleAddFoodToMeal = (food: FoodItem, mealId: string) => {
+    const mult = selectedMultiplier[food.id] || 1;
+    const item: MealFoodItem = {
+      ...food,
+      uid: `${food.id}_${Date.now()}`,
+      foodId: food.id,
+      multiplier: mult
+    };
+
+    setMeals(prev => ({
+      ...prev,
+      [mealId]: [...(prev[mealId] || []), item]
+    }));
+
+    setActiveMealModal(null);
+    showToast(`Adicionado ${food.name} (${mult}x)`);
+  };
+
+  const handleRemoveMealItem = (mealId: string, uid: string) => {
+    setMeals(prev => ({
+      ...prev,
+      [mealId]: (prev[mealId] || []).filter(item => item.uid !== uid)
+    }));
+  };
+
+  // Criar alimento personalizado
+  const handleCreateCustomFood = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFood.name.trim()) return;
+
+    const prot = parseFloat(newFood.protein) || 0;
+    const carb = parseFloat(newFood.carbs) || 0;
+    const fat = parseFloat(newFood.fat) || 0;
+    const cals = Math.round((prot * 4) + (carb * 4) + (fat * 9));
+
+    const customItem: FoodItem = {
+      id: `custom_${Date.now()}`,
+      name: newFood.name.trim(),
+      portion: newFood.portion.trim() || '1 porção',
+      calories: cals,
+      protein: prot,
+      carbs: carb,
+      fat: fat,
+      category: newFood.category.trim() || 'Personalizado'
+    };
+
+    setFoodsList(prev => [customItem, ...prev]);
+    setIsCustomFoodModalOpen(false);
+    setNewFood({ name: '', portion: '1 porção', calories: '', protein: '', carbs: '', fat: '', category: 'Personalizado' });
+    showToast('Alimento cadastrado com sucesso!');
+  };
+
+  // Registrar nova pesagem
   const handleLogWeight = (e: React.FormEvent) => {
     e.preventDefault();
     const w = parseFloat(newWeightInput);
-    if (!w || w <= 0) return;
+    if (!w || isNaN(w)) return;
 
     setUserStats(prev => ({ ...prev, weight: w }));
-    const entry: WeightEntry = {
+    const newEntry: WeightEntry = {
       id: `w_${Date.now()}`,
       date: new Date().toLocaleDateString('pt-BR'),
       weight: w
     };
-    setWeightHistory(prev => [entry, ...prev]);
+    setWeightHistory(prev => [newEntry, ...prev]);
     showToast(`Peso atualizado para ${w} kg!`);
   };
 
-  // Totais consumidos no dia
+  // Totais consumidos no dia (soma de todas as 5 refeições)
   const dailyTotals = useMemo(() => {
-    let calories = 0, protein = 0, carbs = 0, fat = 0;
+    let calories = 0;
+    let protein = 0;
+    let carbs = 0;
+    let fat = 0;
+
     Object.values(meals).forEach(mealItems => {
       mealItems.forEach(item => {
         calories += item.calories * item.multiplier;
@@ -221,93 +340,38 @@ export function App() {
         fat += item.fat * item.multiplier;
       });
     });
+
     return {
       calories: Math.round(calories),
-      protein: Math.round(protein * 10) / 10,
-      carbs: Math.round(carbs * 10) / 10,
-      fat: Math.round(fat * 10) / 10
+      protein: Math.round(protein),
+      carbs: Math.round(carbs),
+      fat: Math.round(fat)
     };
   }, [meals]);
 
-  // Déficit e O que Falta atingir
+  // "O QUE ESTÁ ME FALTANDO HOJE" - Balanço de Nutrientes
   const missingNutrients = useMemo(() => {
-    const remCalories = Math.max(0, goals.calories - dailyTotals.calories);
-    const remProtein = Math.max(0, Math.round((goals.protein - dailyTotals.protein) * 10) / 10);
-    const remCarbs = Math.max(0, Math.round((goals.carbs - dailyTotals.carbs) * 10) / 10);
-    const remFat = Math.max(0, Math.round((goals.fat - dailyTotals.fat) * 10) / 10);
-
     return {
-      calories: remCalories,
-      protein: remProtein,
-      carbs: remCarbs,
-      fat: remFat
+      calories: Math.max(0, goals.calories - dailyTotals.calories),
+      protein: Math.max(0, goals.protein - dailyTotals.protein),
+      carbs: Math.max(0, goals.carbs - dailyTotals.carbs),
+      fat: Math.max(0, goals.fat - dailyTotals.fat)
     };
   }, [goals, dailyTotals]);
 
-  // Alimentos filtrados
-  const filteredFoods = useMemo(() => {
-    return foodsList.filter(f => {
-      const matchSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          f.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchCat = selectedCategory === 'Todos' || f.category === selectedCategory;
-      return matchSearch && matchCat;
-    });
-  }, [foodsList, searchQuery, selectedCategory]);
-
+  // Categorias dinâmicas baseadas na lista de alimentos atual
   const categories = useMemo(() => {
-    const set = new Set(foodsList.map(f => f.category));
-    return ['Todos', ...Array.from(set)];
+    const cats = Array.from(new Set(foodsList.map(f => f.category)));
+    return ['Todos', ...cats];
   }, [foodsList]);
 
-  const handleAddFoodToMeal = (food: FoodItem, mealId: string) => {
-    const mult = selectedMultiplier[food.id] || 1;
-    const newItem: MealFoodItem = {
-      ...food,
-      uid: `food_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      foodId: food.id,
-      multiplier: mult
-    };
-
-    setMeals(prev => ({
-      ...prev,
-      [mealId]: [...(prev[mealId] || []), newItem]
-    }));
-
-    setSelectedMultiplier(prev => ({ ...prev, [food.id]: 1 }));
-    showToast(`${food.name} adicionado!`);
-  };
-
-  const handleRemoveMealItem = (mealId: string, uid: string) => {
-    setMeals(prev => ({
-      ...prev,
-      [mealId]: prev[mealId].filter(item => item.uid !== uid)
-    }));
-  };
-
-  const handleCreateCustomFood = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFood.name.trim()) return;
-    const p = parseFloat(newFood.protein) || 0;
-    const c = parseFloat(newFood.carbs) || 0;
-    const f = parseFloat(newFood.fat) || 0;
-    const cal = parseFloat(newFood.calories) || Math.round((p * 4) + (c * 4) + (f * 9));
-
-    const created: FoodItem = {
-      id: `custom_${Date.now()}`,
-      name: newFood.name.trim(),
-      portion: newFood.portion || '100g',
-      calories: cal,
-      protein: p,
-      carbs: c,
-      fat: f,
-      category: newFood.category || 'Personalizado'
-    };
-
-    setFoodsList(prev => [created, ...prev]);
-    setIsCustomFoodModalOpen(false);
-    setNewFood({ name: '', portion: '100g', calories: '', protein: '', carbs: '', fat: '', category: 'Personalizado' });
-    showToast('Alimento cadastrado com sucesso!');
-  };
+  const filteredFoods = useMemo(() => {
+    return foodsList.filter(food => {
+      const matchQuery = food.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCategory = selectedCategory === 'Todos' || food.category === selectedCategory;
+      return matchQuery && matchCategory;
+    });
+  }, [foodsList, searchQuery, selectedCategory]);
 
   // Exportar Backup JSON com 1 Clique
   const handleExportBackup = () => {
@@ -316,7 +380,8 @@ export function App() {
       goals,
       meals,
       waterMl,
-      coffeeCups,
+      coffeeSmallCups,
+      coffeeLargeCups,
       medications,
       weightHistory,
       foodsList,
@@ -345,7 +410,8 @@ export function App() {
         if (parsed.goals) setGoals(parsed.goals);
         if (parsed.meals) setMeals(parsed.meals);
         if (parsed.waterMl !== undefined) setWaterMl(parsed.waterMl);
-        if (parsed.coffeeCups !== undefined) setCoffeeCups(parsed.coffeeCups);
+        if (parsed.coffeeSmallCups !== undefined) setCoffeeSmallCups(parsed.coffeeSmallCups);
+        if (parsed.coffeeLargeCups !== undefined) setCoffeeLargeCups(parsed.coffeeLargeCups);
         if (parsed.medications) setMedications(parsed.medications);
         if (parsed.weightHistory) setWeightHistory(parsed.weightHistory);
         if (parsed.foodsList) setFoodsList(parsed.foodsList);
@@ -365,87 +431,79 @@ export function App() {
   const takenMedsCount = medications.filter(m => m.takenToday).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-24 selection:bg-emerald-500 selection:text-white">
-      {/* Toast Alert */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-24 selection:bg-emerald-500 selection:text-slate-950">
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 right-4 z-50 flex items-center gap-2.5 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-emerald-400/30 text-xs font-bold animate-bounce">
-          <Check className="w-4 h-4" />
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-emerald-500/40 text-emerald-300 px-4 py-2 rounded-2xl shadow-2xl text-xs font-semibold flex items-center gap-2 animate-bounce">
+          <Sparkles className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Scale className="w-5 h-5 text-slate-950" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-base font-black tracking-tight text-white">BodyMonitor</h1>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                75kg ➔ 65kg
-              </span>
+      {/* Header Fixo Mobile */}
+      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-950 text-sm shadow-md">
+              BM
             </div>
-            <p className="text-[10px] text-slate-400">Rotina Pessoal de Saúde</p>
+            <div>
+              <h1 className="text-sm font-extrabold tracking-tight text-white flex items-center gap-1.5">
+                BodyMonitor
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
+                  Felipe &middot; 75➔65kg
+                </span>
+              </h1>
+              <p className="text-[10px] text-slate-400">Nutrição, Hidratação & Saúde Pessoal</p>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {activeTab === 'meals' && (
-            <button
-              onClick={() => setIsCustomFoodModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-xs font-semibold"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Alimento</span>
-            </button>
-          )}
 
           <button
             onClick={() => setIsGoalsModalOpen(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20"
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1 text-xs cursor-pointer"
+            title="Ajustar Metas Diárias"
           >
-            <Calculator className="w-3.5 h-3.5" />
-            <span>Metas</span>
+            <Calculator className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold">{goals.calories} kcal</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-md mx-auto px-4 pt-4 space-y-4">
-
+      {/* Conteúdo Principal com Abas */}
+      <main className="flex-1 max-w-md mx-auto w-full px-4 pt-4 space-y-4">
         {/* =========================================================================
-            ABA 1: ALIMENTAÇÃO & NUTRIENTES (O QUE FALTA)
+            ABA 1: NUTRIENTES & AS 5 REFEIÇÕES (COM CEIA)
         ========================================================================= */}
         {activeTab === 'meals' && (
           <div className="space-y-4">
-            {/* Card Principal: Calorias & Déficit */}
+            {/* Bloco de Resumo Calórico & "O Que Está Me Faltando" */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Meta para 65kg (Cutting)</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Balanço Diário
+                  </span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-3xl font-black text-white">{dailyTotals.calories}</span>
-                    <span className="text-xs text-slate-400">/ {goals.calories} kcal</span>
+                    <span className="text-2xl font-black text-white font-mono">{dailyTotals.calories}</span>
+                    <span className="text-xs text-slate-400 font-mono">/ {goals.calories} kcal</span>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Restam Hoje</span>
-                  <span className={`text-xl font-black font-mono ${missingNutrients.calories === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {missingNutrients.calories} kcal
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Restante</span>
+                  <span className={`text-base font-black font-mono ${
+                    missingNutrients.calories > 0 ? 'text-emerald-400' : 'text-amber-400'
+                  }`}>
+                    {missingNutrients.calories > 0 ? `-${missingNutrients.calories}` : 'Meta Atingida!'}
                   </span>
                 </div>
               </div>
 
               {/* Barra de Progresso de Calorias */}
-              <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
+              <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                 <div 
-                  className={`h-full transition-all duration-500 ${
-                    dailyTotals.calories > goals.calories ? 'bg-rose-500' : 'bg-emerald-500'
-                  }`}
-                  style={{ width: `${Math.min(100, (dailyTotals.calories / (goals.calories || 1)) * 100)}%` }}
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.round((dailyTotals.calories / goals.calories) * 100))}%` }}
                 />
               </div>
 
@@ -454,9 +512,9 @@ export function App() {
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                   <span className="flex items-center gap-1.5 text-emerald-400">
                     <Sparkles className="w-3.5 h-3.5" />
-                    Balanço de Nutrientes Restantes
+                    O Que Está Faltando Hoje
                   </span>
-                  <span className="text-[10px] text-slate-500">Meta Diária</span>
+                  <span className="text-[10px] text-slate-500">Meta: 150g prot</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1">
@@ -487,7 +545,7 @@ export function App() {
               </div>
             </div>
 
-            {/* As 4 Refeições */}
+            {/* As 5 Refeições (Café, Almoço, Lanche, Jantar e Ceia) */}
             <div className="space-y-3">
               {MEALS_CONFIG.map(meal => {
                 const items = meals[meal.id] || [];
@@ -515,6 +573,7 @@ export function App() {
                         <button
                           onClick={() => setActiveMealModal(meal.id)}
                           className="p-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500 hover:text-black text-emerald-400 transition cursor-pointer"
+                          title={`Adicionar alimento ao ${meal.title}`}
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -529,15 +588,16 @@ export function App() {
                       <div className="space-y-1">
                         {items.map(item => (
                           <div key={item.uid} className="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px]">
-                            <div>
-                              <span className="font-semibold text-slate-200">{item.name}</span>
-                              <span className="text-[10px] text-slate-500 ml-1.5">({item.multiplier}x {item.portion})</span>
+                            <div className="pr-2">
+                              <span className="font-semibold text-slate-200 block">{item.name}</span>
+                              <span className="text-[10px] text-slate-500">({item.multiplier}x {item.portion})</span>
                             </div>
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2.5 shrink-0">
                               <span className="font-mono text-emerald-400 font-bold">{Math.round(item.calories * item.multiplier)} kcal</span>
                               <button
                                 onClick={() => handleRemoveMealItem(meal.id, item.uid)}
-                                className="text-slate-600 hover:text-rose-400 p-0.5"
+                                className="text-slate-600 hover:text-rose-400 p-0.5 cursor-pointer"
+                                title="Remover item"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>
@@ -554,11 +614,11 @@ export function App() {
         )}
 
         {/* =========================================================================
-            ABA 2: HIDRATAÇÃO (2.6L) & MONITOR DE CAFÉ (DESMAME)
+            ABA 2: HIDRATAÇÃO (2.6L) & MONITOR DE CAFÉ COM LIMITE SEGURO (400mg)
         ========================================================================= */}
         {activeTab === 'water_coffee' && (
           <div className="space-y-4">
-            {/* Bloco 1: Hidratação */}
+            {/* Bloco 1: Hidratação Diária */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4 text-center">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-left">
@@ -567,7 +627,7 @@ export function App() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white">Hidratação Diária</h3>
-                    <p className="text-[10px] text-slate-400">Meta de 35ml/kg ({userStats.weight}kg = {waterGoalMl}ml)</p>
+                    <p className="text-[10px] text-slate-400">Meta: 35ml/kg ({userStats.weight}kg = {waterGoalMl}ml)</p>
                   </div>
                 </div>
 
@@ -576,48 +636,46 @@ export function App() {
                 </span>
               </div>
 
-              {/* Indicador de Volume */}
+              {/* Indicador de Volume de Água */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                <span className="text-3xl font-black text-white">{waterMl}</span>
-                <span className="text-xs font-bold text-slate-400 ml-1">/ {waterGoalMl} ml</span>
-                
-                <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden mt-3 border border-slate-800">
+                <span className="text-3xl font-black font-mono text-white block">
+                  {waterMl} <span className="text-sm font-normal text-slate-400">/ {waterGoalMl} ml</span>
+                </span>
+
+                <div className="w-full h-3 bg-slate-900 rounded-full mt-3 overflow-hidden border border-slate-800">
                   <div 
-                    className="h-full bg-sky-500 rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-sky-500 to-blue-500 rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(100, (waterMl / (waterGoalMl || 1)) * 100)}%` }}
                   />
                 </div>
               </div>
 
-              {/* Botões de Água */}
-              <div className="grid grid-cols-4 gap-2">
+              {/* Botões Rápidos de Hidratação */}
+              <div className="grid grid-cols-4 gap-2 pt-1">
                 <button
                   onClick={() => handleAddWater(200)}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1 active:scale-95 cursor-pointer"
                 >
                   <Droplets className="w-3.5 h-3.5 text-sky-400" />
                   <span>+200ml</span>
                 </button>
-
                 <button
                   onClick={() => handleAddWater(300)}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1 active:scale-95 cursor-pointer"
                 >
                   <Droplets className="w-3.5 h-3.5 text-sky-400" />
                   <span>+300ml</span>
                 </button>
-
                 <button
                   onClick={() => handleAddWater(500)}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1 active:scale-95 cursor-pointer"
                 >
                   <Droplets className="w-3.5 h-3.5 text-sky-400" />
                   <span>+500ml</span>
                 </button>
-
                 <button
                   onClick={() => handleAddWater(1000)}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-bold transition flex flex-col items-center gap-1 active:scale-95 cursor-pointer"
                 >
                   <Droplets className="w-3.5 h-3.5 text-sky-400" />
                   <span>+1.0L</span>
@@ -627,107 +685,205 @@ export function App() {
               {waterMl > 0 && (
                 <button
                   onClick={() => handleAddWater(-250)}
-                  className="text-[10px] text-slate-500 hover:text-rose-400 transition"
+                  className="text-[10px] text-slate-500 hover:text-rose-400 transition cursor-pointer"
                 >
                   Desfazer (-250ml)
                 </button>
               )}
             </div>
 
-            {/* Bloco 2: Monitor & Redução de Café */}
+            {/* Bloco 2: Monitor & Limite Diário de Café com Discriminação de Copos */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`p-2 rounded-xl ${
-                    coffeeCups > coffeeLimit ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
+                    totalCaffeineMg > MAX_SAFE_CAFFEINE_MG 
+                      ? 'bg-rose-500/10 text-rose-400' 
+                      : totalCaffeineMg >= 300 
+                      ? 'bg-amber-500/10 text-amber-400' 
+                      : 'bg-amber-500/10 text-amber-400'
                   }`}>
                     <Coffee className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">Consumo de Café</h3>
-                    <p className="text-[10px] text-slate-400">Meta: Diminuir o excesso diário</p>
+                    <h3 className="text-sm font-bold text-white">Consumo de Café & Cafeína</h3>
+                    <p className="text-[10px] text-slate-400">Máximo seguro recomendado: 400 mg</p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className={`text-base font-black font-mono ${
-                    coffeeCups > coffeeLimit ? 'text-rose-400' : coffeeCups === coffeeLimit ? 'text-amber-400' : 'text-emerald-400'
+                  <span className={`text-sm font-black font-mono block ${
+                    totalCaffeineMg > MAX_SAFE_CAFFEINE_MG 
+                      ? 'text-rose-400' 
+                      : totalCaffeineMg >= 300 
+                      ? 'text-amber-400' 
+                      : 'text-emerald-400'
                   }`}>
-                    {coffeeCups} / {coffeeLimit} xícaras
+                    {totalCaffeineMg} / 400 mg
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Total: {totalCoffeeMl} ml
                   </span>
                 </div>
               </div>
 
-              {/* Status do Café */}
-              <div className={`p-3 rounded-2xl border text-xs flex items-center justify-between ${
-                coffeeCups > coffeeLimit 
-                  ? 'bg-rose-950/40 border-rose-500/30 text-rose-300'
-                  : coffeeCups === coffeeLimit
-                  ? 'bg-amber-950/40 border-amber-500/30 text-amber-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-300'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {coffeeCups > coffeeLimit ? (
-                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                  ) : (
-                    <Coffee className="w-4 h-4 text-amber-400 shrink-0" />
-                  )}
-                  <span>
-                    {coffeeCups > coffeeLimit 
-                      ? '⚠️ Limite ultrapassado! Evite café agora para não prejudicar seu sono.'
-                      : coffeeCups === coffeeLimit
-                      ? '🟡 Limite atingido! Tente substituir o próximo por água.'
-                      : '🟢 Consumo moderado dentro da meta.'}
+              {/* Barra de Progresso da Cafeína vs Teto Máximo */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5">
+                <div className="flex justify-between text-[11px] font-semibold">
+                  <span className="text-slate-400">Ingestão de Cafeína</span>
+                  <span className={
+                    totalCaffeineMg > MAX_SAFE_CAFFEINE_MG 
+                      ? 'text-rose-400 font-bold' 
+                      : totalCaffeineMg >= 300 
+                      ? 'text-amber-400 font-bold' 
+                      : 'text-emerald-400 font-bold'
+                  }>
+                    {caffeinePct}% do limite máximo diário
                   </span>
                 </div>
+
+                <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      totalCaffeineMg > MAX_SAFE_CAFFEINE_MG 
+                        ? 'bg-rose-500' 
+                        : totalCaffeineMg >= 300 
+                        ? 'bg-amber-500' 
+                        : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(caffeinePct, totalCaffeineMg > 0 ? 5 : 0))}%` }}
+                  />
+                </div>
+
+                <div className="flex justify-between text-[9px] text-slate-500 pt-0.5">
+                  <span>0 mg</span>
+                  <span>200 mg (Moderado)</span>
+                  <span>400 mg (Teto Seguro)</span>
+                </div>
+              </div>
+
+              {/* Status com Base no Máximo Diário Recomendado */}
+              <div className={`p-3 rounded-2xl border text-xs flex items-center gap-2.5 ${
+                totalCaffeineMg > MAX_SAFE_CAFFEINE_MG 
+                  ? 'bg-rose-950/40 border-rose-500/30 text-rose-300'
+                  : totalCaffeineMg >= 300
+                  ? 'bg-amber-950/40 border-amber-500/30 text-amber-300'
+                  : totalCaffeineMg > 0
+                  ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400'
+              }`}>
+                {totalCaffeineMg > MAX_SAFE_CAFFEINE_MG ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : (
+                  <Coffee className="w-4 h-4 text-amber-400 shrink-0" />
+                )}
+                <span className="leading-snug">
+                  {totalCaffeineMg > MAX_SAFE_CAFFEINE_MG 
+                    ? '⚠️ Acima do teto máximo recomendado (400 mg)! Risco de sobrecarga cardíaca, agitação e ansiedade.'
+                    : totalCaffeineMg >= 300
+                    ? '🟡 Atenção: Próximo ao limite máximo diário de 400 mg de cafeína.'
+                    : totalCaffeineMg > 0
+                    ? '🟢 Consumo moderado dentro da faixa segura e saudável.'
+                    : 'Nenhum café registrado hoje.'}
+                </span>
+              </div>
+
+              {/* Discriminação por Tipos de Copos Plásticos */}
+              <div className="space-y-2 pt-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  Discriminação de Recipientes & Quantidade:
+                </span>
+
+                {/* Copinho de Plástico Pequeno (50ml) */}
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">Copinho de Plástico Pequeno</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono font-bold">50 ml</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      ~40 mg cafeína/copinho &middot; <strong className="text-slate-300">{coffeeSmallCups} tomados</strong> ({coffeeSmallCups * 50} ml)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {coffeeSmallCups > 0 && (
+                      <button
+                        onClick={() => handleAddSmallCoffee(-1)}
+                        className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold flex items-center justify-center transition cursor-pointer"
+                        title="Desfazer 1 copinho"
+                      >
+                        -
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleAddSmallCoffee(1)}
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-md"
+                    >
+                      <Plus className="w-3 h-3 stroke-[3]" />
+                      <span>+50ml</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Copo Plástico Comum (200ml) */}
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">Copo Plástico Comum</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 font-mono font-bold">200 ml</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      ~160 mg cafeína/copo &middot; <strong className="text-slate-300">{coffeeLargeCups} tomados</strong> ({coffeeLargeCups * 200} ml)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {coffeeLargeCups > 0 && (
+                      <button
+                        onClick={() => handleAddLargeCoffee(-1)}
+                        className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold flex items-center justify-center transition cursor-pointer"
+                        title="Desfazer 1 copo"
+                      >
+                        -
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleAddLargeCoffee(1)}
+                      className="px-2.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-md"
+                    >
+                      <Plus className="w-3 h-3 stroke-[3]" />
+                      <span>+200ml</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações Médicas Educativas */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[10px] text-slate-400 leading-relaxed">
+                <strong className="text-slate-200 block mb-0.5">Diretriz Médica Internacional (FDA / EFSA):</strong>
+                Para um adulto de 75 kg, o limite máximo diário de segurança é de <strong>400 mg de cafeína</strong> (~500 ml de café coado). Isso equivale a no máximo <strong>8 copinhos pequenos de 50 ml</strong> ou <strong>2 copos plásticos comuns de 200 ml</strong> por dia.
               </div>
 
               {lastCoffeeTime && (
-                <p className="text-[10px] text-slate-500 text-center">
-                  Último café registrado às <strong>{lastCoffeeTime}</strong>
-                </p>
-              )}
-
-              {/* Botões de Ação de Café */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  onClick={() => handleAddCoffee(1)}
-                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500/50 text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+1 Xícara (Cafezinho)</span>
-                </button>
-
-                <button
-                  onClick={() => setCoffeeCups(prev => Math.max(0, prev - 1))}
-                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:bg-slate-800 text-xs text-slate-400 transition"
-                >
-                  Desfazer (-1)
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                <span>Limite diário desejado:</span>
-                <div className="flex items-center gap-1">
-                  {[2, 3, 4].map(lim => (
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                  <span>Último café registrado às <strong>{lastCoffeeTime}</strong></span>
+                  {(coffeeSmallCups > 0 || coffeeLargeCups > 0) && (
                     <button
-                      key={lim}
-                      onClick={() => setCoffeeLimit(lim)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        coffeeLimit === lim ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                      }`}
+                      onClick={handleResetCoffee}
+                      className="text-rose-400/80 hover:text-rose-300 transition cursor-pointer"
                     >
-                      {lim}x
+                      Zerar cafés hoje
                     </button>
-                  ))}
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
 
         {/* =========================================================================
-            ABA 3: CHECKLIST DE REMÉDIOS & SUPLEMENTOS
+            ABA 3: CHECKLIST DE REMÉDIOS (OMEPRAZOL & OLMESARTANA ÀS 08:00)
         ========================================================================= */}
         {activeTab === 'meds' && (
           <div className="space-y-4">
@@ -739,43 +895,47 @@ export function App() {
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-white">Checklist de Remédios</h2>
-                    <p className="text-[10px] text-slate-400">Não esqueça suas doses diárias</p>
+                    <p className="text-[10px] text-slate-400">Rotina diária matinal às 08:00</p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setIsAddMedModalOpen(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Novo</span>
                 </button>
               </div>
 
-              {/* Barra de progresso dos remédios */}
-              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Status de hoje:</span>
-                <span className="font-bold text-purple-400 font-mono">
-                  {takenMedsCount} de {medications.length} tomados ({medications.length > 0 ? Math.round((takenMedsCount / medications.length) * 100) : 0}%)
+              {/* Barra de Progresso dos Remédios */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <span className="text-xs text-slate-300 font-semibold">
+                  {takenMedsCount === medications.length && medications.length > 0
+                    ? '🎉 Todos os remédios tomados hoje!'
+                    : `${takenMedsCount} de ${medications.length} tomados hoje`}
+                </span>
+                <span className="text-xs font-mono font-bold text-purple-400">
+                  {medications.length > 0 ? Math.round((takenMedsCount / medications.length) * 100) : 0}%
                 </span>
               </div>
 
-              {/* Lista com Checkboxes Grandes para toque móvel */}
+              {/* Lista dos Remédios com Checkbox Largo */}
               <div className="space-y-2">
                 {medications.map(med => (
                   <div
                     key={med.id}
                     onClick={() => handleToggleMedication(med.id)}
-                    className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between select-none ${
-                      med.takenToday 
-                        ? 'bg-emerald-950/30 border-emerald-500/40 text-slate-200' 
-                        : 'bg-slate-950 border-slate-800 text-white hover:border-purple-500/40'
+                    className={`p-3.5 rounded-2xl border transition flex items-center justify-between cursor-pointer ${
+                      med.takenToday
+                        ? 'bg-purple-950/20 border-purple-500/40 text-purple-100'
+                        : 'bg-slate-950 border-slate-800/90 text-slate-300 hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition ${
-                        med.takenToday 
-                          ? 'bg-emerald-500 border-emerald-400 text-slate-950' 
+                        med.takenToday
+                          ? 'bg-purple-500 border-purple-400 text-slate-950'
                           : 'border-slate-700 bg-slate-900'
                       }`}>
                         {med.takenToday && <Check className="w-4 h-4 stroke-[3]" />}
@@ -791,16 +951,27 @@ export function App() {
                       </div>
                     </div>
 
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       {med.takenToday ? (
                         <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                          Tomado {med.takenAt && `às ${med.takenAt}`}
+                          {med.takenAt ? `Tomado às ${med.takenAt}` : 'Tomado'}
                         </span>
                       ) : (
                         <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
                           Pendente
                         </span>
                       )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveMedication(med.id);
+                        }}
+                        className="text-slate-600 hover:text-rose-400 p-1 cursor-pointer"
+                        title="Remover remédio"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -809,7 +980,7 @@ export function App() {
               <div className="pt-2 flex justify-between items-center text-[11px]">
                 <button
                   onClick={handleResetDailyMeds}
-                  className="text-slate-500 hover:text-slate-300 flex items-center gap-1"
+                  className="text-slate-500 hover:text-slate-300 flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className="w-3 h-3" />
                   <span>Resetar para novo dia</span>
@@ -906,7 +1077,7 @@ export function App() {
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   onClick={handleExportBackup}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5 transition"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Baixar Backup</span>
@@ -914,7 +1085,7 @@ export function App() {
 
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Restaurar</span>
@@ -978,7 +1149,7 @@ export function App() {
       </nav>
 
       {/* =========================================================================
-          MODAL: ADICIONAR ALIMENTO (TABELA TACO)
+          MODAL: ADICIONAR ALIMENTO À REFEIÇÃO
       ========================================================================= */}
       {activeMealModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -989,14 +1160,23 @@ export function App() {
                   <Utensils className="w-4 h-4 text-emerald-400" />
                   Adicionar ao {MEALS_CONFIG.find(m => m.id === activeMealModal)?.title}
                 </h3>
-                <p className="text-[10px] text-slate-400">Tabela TACO / IBGE</p>
+                <p className="text-[10px] text-slate-400">Alimentos da sua rotina</p>
               </div>
-              <button
-                onClick={() => setActiveMealModal(null)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsCustomFoodModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-[10px] border border-emerald-500/30 hover:bg-emerald-500/30 transition cursor-pointer"
+                >
+                  <PlusCircle className="w-3 h-3" />
+                  <span>Cadastrar Novo</span>
+                </button>
+                <button
+                  onClick={() => setActiveMealModal(null)}
+                  className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-3 border-b border-slate-800 space-y-2 bg-slate-950/40">
@@ -1004,7 +1184,7 @@ export function App() {
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Buscar alimento (ex: Frango, Arroz, Whey...)"
+                  placeholder="Buscar na sua lista..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -1016,7 +1196,7 @@ export function App() {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition ${
+                    className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition cursor-pointer ${
                       selectedCategory === cat ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
                     }`}
                   >
@@ -1043,7 +1223,7 @@ export function App() {
                       <select
                         value={mult}
                         onChange={(e) => setSelectedMultiplier({ ...selectedMultiplier, [food.id]: parseFloat(e.target.value) })}
-                        className="bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-1 text-xs text-white"
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-1 text-xs text-white cursor-pointer"
                       >
                         <option value="0.5">0.5x</option>
                         <option value="1">1x</option>
@@ -1054,7 +1234,7 @@ export function App() {
 
                       <button
                         onClick={() => handleAddFoodToMeal(food, activeMealModal)}
-                        className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                        className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer shadow"
                       >
                         <Plus className="w-3.5 h-3.5 stroke-[3]" />
                       </button>
@@ -1078,18 +1258,18 @@ export function App() {
                 <Pill className="w-4 h-4 text-purple-400" />
                 Adicionar ao Checklist
               </h3>
-              <button onClick={() => setIsAddMedModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setIsAddMedModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleAddMedication} className="space-y-3">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Nome do Medicamento / Suplemento *</label>
+                <label className="text-[10px] text-slate-400 block mb-1">Nome do Medicamento *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Vitamina C, Losartana, Creatina"
+                  placeholder="Ex: Omeprazol, Olmesartana"
                   value={newMed.name}
                   onChange={(e) => setNewMed({ ...newMed, name: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
@@ -1100,7 +1280,7 @@ export function App() {
                 <label className="text-[10px] text-slate-400 block mb-1">Dosagem</label>
                 <input
                   type="text"
-                  placeholder="Ex: 1 cápsula, 50mg, 1 scoop"
+                  placeholder="Ex: 2 comprimidos, 1 cápsula"
                   value={newMed.dosage}
                   onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
@@ -1111,7 +1291,7 @@ export function App() {
                 <label className="text-[10px] text-slate-400 block mb-1">Horário Previsto</label>
                 <input
                   type="text"
-                  placeholder="Ex: 08:00 (Jejum) ou Após Almoço"
+                  placeholder="Ex: 08:00 (Manhã)"
                   value={newMed.scheduledTime}
                   onChange={(e) => setNewMed({ ...newMed, scheduledTime: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
@@ -1120,7 +1300,7 @@ export function App() {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs"
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow-lg"
               >
                 Salvar no Checklist
               </button>
@@ -1138,9 +1318,9 @@ export function App() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
                 <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-                Cadastrar Alimento Próprio
+                Cadastrar Alimento na sua Rotina
               </h3>
-              <button onClick={() => setIsCustomFoodModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setIsCustomFoodModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1151,9 +1331,20 @@ export function App() {
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Crepioca com Queijo"
+                  placeholder="Ex: Salada de Frutas com Granola"
                   value={newFood.name}
                   onChange={(e) => setNewFood({ ...newFood, name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-0.5">Porção de Referência</label>
+                <input
+                  type="text"
+                  placeholder="Ex: 1 prato, 1 pote, 2 fatias"
+                  value={newFood.portion}
+                  onChange={(e) => setNewFood({ ...newFood, portion: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white"
                 />
               </div>
@@ -1196,7 +1387,7 @@ export function App() {
 
               <button
                 type="submit"
-                className="w-full py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs mt-2"
+                className="w-full py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs mt-2 cursor-pointer shadow"
               >
                 Salvar Alimento
               </button>
@@ -1216,7 +1407,7 @@ export function App() {
                 <Calculator className="w-4 h-4 text-emerald-400" />
                 Ajustar Metas Nutricionais
               </h3>
-              <button onClick={() => setIsGoalsModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setIsGoalsModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1264,7 +1455,7 @@ export function App() {
 
               <button
                 onClick={() => { setIsGoalsModalOpen(false); showToast('Metas salvas!'); }}
-                className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs"
+                className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs cursor-pointer shadow"
               >
                 Salvar Metas
               </button>
