@@ -6,6 +6,8 @@ export interface FoodItem {
   protein: number;
   carbs: number;
   fat: number;
+  sodium: number; // em miligramas (mg)
+  sugar: number;  // em gramas (g)
   category: string;
 }
 
@@ -31,6 +33,8 @@ export interface DailyGoals {
   protein: number;
   carbs: number;
   fat: number;
+  sodiumLimit: number; // Limite máximo diário OMS / SBC (2.000 mg)
+  sugarLimit: number;  // Limite máximo diário de açúcares livres OMS (30 g)
 }
 
 export interface MedicationItem {
@@ -77,7 +81,7 @@ export const INITIAL_MEDICATIONS: MedicationItem[] = [
   }
 ];
 
-// Lista exclusiva de alimentos da rotina do Felipe
+// Lista exclusiva de alimentos da rotina do Felipe com Sódio (mg) e Açúcar (g)
 export const INITIAL_FOODS: FoodItem[] = [
   {
     id: 'food-leite-nescau',
@@ -87,36 +91,44 @@ export const INITIAL_FOODS: FoodItem[] = [
     protein: 6.7,
     carbs: 27.0,
     fat: 3.2,
+    sodium: 130, // 100mg leite + 30mg Nescau
+    sugar: 25.0, // 15g Nescau adicionado + 10g lactose
     category: 'Bebidas'
   },
   {
     id: 'food-omelete-2-ovos',
-    name: 'Omelete (com 2 ovos)',
-    portion: '1 porção (2 ovos médios)',
+    name: 'Omelete (com 2 ovos e sal)',
+    portion: '1 porção (2 ovos médios + pitada de sal)',
     calories: 155,
     protein: 13.0,
     carbs: 1.0,
     fat: 11.0,
+    sodium: 540, // 140mg natural dos ovos + ~400mg pitada de sal
+    sugar: 0.8,
     category: 'Ovos & Proteínas'
   },
   {
     id: 'food-crepioca-2-ovos',
-    name: 'Crepioca (com 2 ovos)',
-    portion: '1 unidade (2 ovos + 30g goma tapioca)',
+    name: 'Crepioca (com 2 ovos e sal)',
+    portion: '1 unidade (2 ovos + 30g goma tapioca + pitada de sal)',
     calories: 225,
     protein: 13.0,
     carbs: 18.5,
     fat: 11.0,
+    sodium: 540, // 140mg natural + ~400mg pitada de sal
+    sugar: 0.8,
     category: 'Lanches'
   },
   {
-    id: 'food-pao-manteiga-sanduicheira',
-    name: '2 fatias de pão de forma com manteiga no meio (feito na sanduicheira)',
-    portion: '1 sanduíche prensado (2 fatias + 10g manteiga)',
-    calories: 199,
-    protein: 4.3,
+    id: 'food-pao-margarina-sanduicheira',
+    name: '2 fatias de pão de forma com margarina com sal no meio (feito na sanduicheira)',
+    portion: '1 sanduíche prensado (2 fatias + 10g margarina c/ sal)',
+    calories: 197,
+    protein: 4.2,
     carbs: 24.0,
-    fat: 9.7,
+    fat: 9.5,
+    sodium: 335, // 240mg pão + 95mg margarina com sal
+    sugar: 2.5,
     category: 'Sanduíches'
   },
   {
@@ -127,6 +139,8 @@ export const INITIAL_FOODS: FoodItem[] = [
     protein: 8.0,
     carbs: 25.0,
     fat: 5.4,
+    sodium: 390, // 240mg pão + 150mg requeijão light
+    sugar: 3.5,
     category: 'Sanduíches'
   },
   {
@@ -137,6 +151,8 @@ export const INITIAL_FOODS: FoodItem[] = [
     protein: 7.5,
     carbs: 51.0,
     fat: 15.0,
+    sodium: 1550, // 1.550 mg de sódio no pacote c/ tempero!
+    sugar: 4.0,
     category: 'Refeições Rápidas'
   }
 ];
@@ -150,6 +166,8 @@ export const MEALS_CONFIG = [
   { id: 'ceia', title: 'Ceia', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', time: '21:30 - 23:30' }
 ];
 
-// Parâmetros científicos e de saúde para o café
+// Parâmetros científicos e de saúde para café, sódio e açúcar
 export const MAX_SAFE_CAFFEINE_MG = 400; // Limite máximo diário recomendado pela FDA / EFSA
-export const CAFFEINE_PER_ML = 0.8; // ~0.8mg de cafeína por ml de café coado padrão
+export const MAX_RECOMMENDED_SODIUM_MG = 2000; // Limite máximo de sódio recomendado pela OMS / SBC (5g de sal)
+export const MAX_RECOMMENDED_SUGAR_G = 30; // Limite máximo de açúcar livre diário OMS
+export const CAFFEINE_PER_ML = 0.8;

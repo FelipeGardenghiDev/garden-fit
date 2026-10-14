@@ -3,7 +3,7 @@ import {
   Utensils, Plus, Trash2, Calculator,
   Check, Search, PlusCircle, Droplets,
   Coffee, Pill, Scale, AlertTriangle,
-  Download, Upload, RefreshCw, X, Sparkles
+  Download, Upload, RefreshCw, X, Sparkles, HeartPulse
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -12,6 +12,8 @@ import {
   INITIAL_USER_STATS,
   INITIAL_MEDICATIONS,
   MAX_SAFE_CAFFEINE_MG,
+  MAX_RECOMMENDED_SODIUM_MG,
+  MAX_RECOMMENDED_SUGAR_G,
   FoodItem, 
   MealFoodItem, 
   UserStats, 
@@ -20,15 +22,23 @@ import {
   WeightEntry
 } from './data/tacoDatabase';
 
-const STORAGE_VERSION_TAG = 'bodymonitor_routine_v3';
+const STORAGE_VERSION_TAG = 'bodymonitor_routine_v4';
 
 export function App() {
-  // Garantir migração inicial para a nova rotina personalizada do Felipe
+  // Garantir migração inicial para a nova rotina personalizada com Sódio e Açúcar
   if (typeof window !== 'undefined') {
-    const isV3 = localStorage.getItem(STORAGE_VERSION_TAG) === 'true';
-    if (!isV3) {
+    const isV4 = localStorage.getItem(STORAGE_VERSION_TAG) === 'true';
+    if (!isV4) {
       localStorage.setItem('bodymonitor_foods', JSON.stringify(INITIAL_FOODS));
       localStorage.setItem('bodymonitor_meds', JSON.stringify(INITIAL_MEDICATIONS));
+      localStorage.setItem('bodymonitor_goals', JSON.stringify({
+        calories: 1850,
+        protein: 150,
+        carbs: 180,
+        fat: 55,
+        sodiumLimit: MAX_RECOMMENDED_SODIUM_MG,
+        sugarLimit: MAX_RECOMMENDED_SUGAR_G
+      }));
       
       const currentMealsStr = localStorage.getItem('bodymonitor_meals');
       const parsedMeals = currentMealsStr ? JSON.parse(currentMealsStr) : {};
@@ -52,10 +62,17 @@ export function App() {
     return saved ? JSON.parse(saved) : INITIAL_USER_STATS;
   });
 
-  // 2. Metas diárias calculadas (com déficit para 65kg)
+  // 2. Metas diárias calculadas (com déficit para 65kg, sódio 2000mg e açúcar 30g)
   const [goals, setGoals] = useState<DailyGoals>(() => {
     const saved = localStorage.getItem('bodymonitor_goals');
-    return saved ? JSON.parse(saved) : { calories: 1850, protein: 150, carbs: 180, fat: 55 };
+    return saved ? JSON.parse(saved) : { 
+      calories: 1850, 
+      protein: 150, 
+      carbs: 180, 
+      fat: 55, 
+      sodiumLimit: MAX_RECOMMENDED_SODIUM_MG, 
+      sugarLimit: MAX_RECOMMENDED_SUGAR_G 
+    };
   });
 
   // 3. Alimentos & Refeições
@@ -131,9 +148,17 @@ export function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form novo alimento
+  // Form novo alimento com sódio e açúcar
   const [newFood, setNewFood] = useState({
-    name: '', portion: '1 porção', calories: '', protein: '', carbs: '', fat: '', category: 'Personalizado'
+    name: '', 
+    portion: '1 porção', 
+    calories: '', 
+    protein: '', 
+    carbs: '', 
+    fat: '', 
+    sodium: '', 
+    sugar: '', 
+    category: 'Personalizado'
   });
 
   // Form novo remédio
@@ -282,7 +307,7 @@ export function App() {
     }));
   };
 
-  // Criar alimento personalizado
+  // Criar alimento personalizado com Sódio e Açúcar
   const handleCreateCustomFood = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFood.name.trim()) return;
@@ -290,6 +315,8 @@ export function App() {
     const prot = parseFloat(newFood.protein) || 0;
     const carb = parseFloat(newFood.carbs) || 0;
     const fat = parseFloat(newFood.fat) || 0;
+    const sod = parseFloat(newFood.sodium) || 0;
+    const sug = parseFloat(newFood.sugar) || 0;
     const cals = Math.round((prot * 4) + (carb * 4) + (fat * 9));
 
     const customItem: FoodItem = {
@@ -300,12 +327,24 @@ export function App() {
       protein: prot,
       carbs: carb,
       fat: fat,
+      sodium: sod,
+      sugar: sug,
       category: newFood.category.trim() || 'Personalizado'
     };
 
     setFoodsList(prev => [customItem, ...prev]);
     setIsCustomFoodModalOpen(false);
-    setNewFood({ name: '', portion: '1 porção', calories: '', protein: '', carbs: '', fat: '', category: 'Personalizado' });
+    setNewFood({ 
+      name: '', 
+      portion: '1 porção', 
+      calories: '', 
+      protein: '', 
+      carbs: '', 
+      fat: '', 
+      sodium: '', 
+      sugar: '', 
+      category: 'Personalizado' 
+    });
     showToast('Alimento cadastrado com sucesso!');
   };
 
@@ -325,12 +364,14 @@ export function App() {
     showToast(`Peso atualizado para ${w} kg!`);
   };
 
-  // Totais consumidos no dia (soma de todas as 5 refeições)
+  // Totais consumidos no dia (soma de todas as 5 refeições, incluindo sódio e açúcar)
   const dailyTotals = useMemo(() => {
     let calories = 0;
     let protein = 0;
     let carbs = 0;
     let fat = 0;
+    let sodium = 0;
+    let sugar = 0;
 
     Object.values(meals).forEach(mealItems => {
       mealItems.forEach(item => {
@@ -338,6 +379,8 @@ export function App() {
         protein += item.protein * item.multiplier;
         carbs += item.carbs * item.multiplier;
         fat += item.fat * item.multiplier;
+        sodium += (item.sodium || 0) * item.multiplier;
+        sugar += (item.sugar || 0) * item.multiplier;
       });
     });
 
@@ -345,17 +388,26 @@ export function App() {
       calories: Math.round(calories),
       protein: Math.round(protein),
       carbs: Math.round(carbs),
-      fat: Math.round(fat)
+      fat: Math.round(fat),
+      sodium: Math.round(sodium),
+      sugar: Math.round(sugar * 10) / 10
     };
   }, [meals]);
 
   // "O QUE ESTÁ ME FALTANDO HOJE" - Balanço de Nutrientes
   const missingNutrients = useMemo(() => {
+    const sodLimit = goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG;
+    const sugLimit = goals.sugarLimit || MAX_RECOMMENDED_SUGAR_G;
+
     return {
       calories: Math.max(0, goals.calories - dailyTotals.calories),
       protein: Math.max(0, goals.protein - dailyTotals.protein),
       carbs: Math.max(0, goals.carbs - dailyTotals.carbs),
-      fat: Math.max(0, goals.fat - dailyTotals.fat)
+      fat: Math.max(0, goals.fat - dailyTotals.fat),
+      sodiumRemaining: Math.max(0, sodLimit - dailyTotals.sodium),
+      sodiumExcess: Math.max(0, dailyTotals.sodium - sodLimit),
+      sugarRemaining: Math.max(0, sugLimit - dailyTotals.sugar),
+      sugarExcess: Math.max(0, dailyTotals.sugar - sugLimit)
     };
   }, [goals, dailyTotals]);
 
@@ -454,7 +506,7 @@ export function App() {
                   Felipe &middot; 75➔65kg
                 </span>
               </h1>
-              <p className="text-[10px] text-slate-400">Nutrição, Hidratação & Saúde Pessoal</p>
+              <p className="text-[10px] text-slate-400">Nutrição, Hidratação, Sódio & Saúde</p>
             </div>
           </div>
 
@@ -472,7 +524,7 @@ export function App() {
       {/* Conteúdo Principal com Abas */}
       <main className="flex-1 max-w-md mx-auto w-full px-4 pt-4 space-y-4">
         {/* =========================================================================
-            ABA 1: NUTRIENTES & AS 5 REFEIÇÕES (COM CEIA)
+            ABA 1: NUTRIENTES, SÓDIO, AÇÚCAR & AS 5 REFEIÇÕES (COM CEIA)
         ========================================================================= */}
         {activeTab === 'meals' && (
           <div className="space-y-4">
@@ -507,12 +559,12 @@ export function App() {
                 />
               </div>
 
-              {/* Status "O QUE ESTÁ FALTANDO HOJE" */}
+              {/* Status "O QUE ESTÁ FALTANDO HOJE" - Macronutrientes */}
               <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                   <span className="flex items-center gap-1.5 text-emerald-400">
                     <Sparkles className="w-3.5 h-3.5" />
-                    O Que Está Faltando Hoje
+                    Macronutrientes
                   </span>
                   <span className="text-[10px] text-slate-500">Meta: 150g prot</span>
                 </div>
@@ -543,6 +595,75 @@ export function App() {
                   </div>
                 </div>
               </div>
+
+              {/* NOVO: MONITOR DE SÓDIO & AÇÚCAR */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                  <span className="flex items-center gap-1.5 text-cyan-400">
+                    <HeartPulse className="w-3.5 h-3.5" />
+                    Monitor de Sódio & Açúcar (Saúde Cardiovascular)
+                  </span>
+                  <span className="text-[9px] text-slate-500">Diretriz OMS</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 text-center">
+                  {/* Card de Sódio */}
+                  <div className={`p-2.5 rounded-xl border transition ${
+                    dailyTotals.sodium > (goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG)
+                      ? 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                      : dailyTotals.sodium >= 1600
+                      ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-300'
+                  }`}>
+                    <span className="text-[10px] uppercase font-bold text-cyan-400 block">Sódio Diário</span>
+                    <span className="text-base font-black font-mono text-white block mt-0.5">
+                      {dailyTotals.sodium} <span className="text-[10px] font-normal text-slate-400">/ {goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG} mg</span>
+                    </span>
+                    <span className={`text-[10px] font-bold block mt-1 ${
+                      dailyTotals.sodium > (goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG)
+                        ? 'text-rose-400'
+                        : 'text-emerald-400'
+                    }`}>
+                      {dailyTotals.sodium > (goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG)
+                        ? `⚠️ +${missingNutrients.sodiumExcess}mg acima`
+                        : `Resta ${missingNutrients.sodiumRemaining}mg`}
+                    </span>
+                  </div>
+
+                  {/* Card de Açúcar */}
+                  <div className={`p-2.5 rounded-xl border transition ${
+                    dailyTotals.sugar > (goals.sugarLimit || MAX_RECOMMENDED_SUGAR_G)
+                      ? 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                      : dailyTotals.sugar >= 25
+                      ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-300'
+                  }`}>
+                    <span className="text-[10px] uppercase font-bold text-amber-400 block">Açúcar Diário</span>
+                    <span className="text-base font-black font-mono text-white block mt-0.5">
+                      {dailyTotals.sugar} <span className="text-[10px] font-normal text-slate-400">/ {goals.sugarLimit || MAX_RECOMMENDED_SUGAR_G} g</span>
+                    </span>
+                    <span className={`text-[10px] font-bold block mt-1 ${
+                      dailyTotals.sugar > (goals.sugarLimit || MAX_RECOMMENDED_SUGAR_G)
+                        ? 'text-rose-400'
+                        : 'text-emerald-400'
+                    }`}>
+                      {dailyTotals.sugar > (goals.sugarLimit || MAX_RECOMMENDED_SUGAR_G)
+                        ? `⚠️ +${missingNutrients.sugarExcess}g acima`
+                        : `Resta ${missingNutrients.sugarRemaining}g`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Alerta de Sódio para quem toma Olmesartana */}
+                {dailyTotals.sodium > (goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG) && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-[10px] text-rose-300 leading-snug flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Atenção à Olmesartana:</strong> Seu sódio ultrapassou 2.000 mg hoje ({dailyTotals.sodium} mg). O excesso de sódio retém líquidos e sobrecarrega a pressão arterial. Beba água para ajudar a excretar o excesso.
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* As 5 Refeições (Café, Almoço, Lanche, Jantar e Ceia) */}
@@ -551,6 +672,8 @@ export function App() {
                 const items = meals[meal.id] || [];
                 const mealCals = items.reduce((s, i) => s + (i.calories * i.multiplier), 0);
                 const mealProt = items.reduce((s, i) => s + (i.protein * i.multiplier), 0);
+                const mealSod = items.reduce((s, i) => s + ((i.sodium || 0) * i.multiplier), 0);
+                const mealSug = items.reduce((s, i) => s + ((i.sugar || 0) * i.multiplier), 0);
 
                 return (
                   <div key={meal.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md space-y-2.5">
@@ -568,7 +691,7 @@ export function App() {
                       <div className="flex items-center gap-2">
                         <div className="text-right">
                           <span className="text-xs font-bold text-white block">{Math.round(mealCals)} kcal</span>
-                          <span className="text-[10px] text-rose-400 font-mono">{Math.round(mealProt)}g prot</span>
+                          <span className="text-[10px] text-rose-400 font-mono block">{Math.round(mealProt)}g prot</span>
                         </div>
                         <button
                           onClick={() => setActiveMealModal(meal.id)}
@@ -580,6 +703,19 @@ export function App() {
                       </div>
                     </div>
 
+                    {/* Resumo de Sódio e Açúcar da refeição se houver itens */}
+                    {items.length > 0 && (
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400 px-1">
+                        <span className="flex items-center gap-1">
+                          <strong className="text-cyan-400">{Math.round(mealSod)} mg</strong> sódio
+                        </span>
+                        <span className="text-slate-600">&middot;</span>
+                        <span className="flex items-center gap-1">
+                          <strong className="text-amber-400">{Math.round(mealSug * 10) / 10} g</strong> açúcar
+                        </span>
+                      </div>
+                    )}
+
                     {items.length === 0 ? (
                       <p className="text-[11px] text-slate-500 italic py-1.5 text-center bg-slate-950/40 rounded-xl">
                         Nenhum alimento registrado. Toque no + para adicionar.
@@ -587,20 +723,33 @@ export function App() {
                     ) : (
                       <div className="space-y-1">
                         {items.map(item => (
-                          <div key={item.uid} className="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px]">
-                            <div className="pr-2">
-                              <span className="font-semibold text-slate-200 block">{item.name}</span>
-                              <span className="text-[10px] text-slate-500">({item.multiplier}x {item.portion})</span>
+                          <div key={item.uid} className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="pr-2">
+                                <span className="font-semibold text-slate-200 block">{item.name}</span>
+                                <span className="text-[10px] text-slate-500">({item.multiplier}x {item.portion})</span>
+                              </div>
+                              <div className="flex items-center gap-2.5 shrink-0">
+                                <span className="font-mono text-emerald-400 font-bold">{Math.round(item.calories * item.multiplier)} kcal</span>
+                                <button
+                                  onClick={() => handleRemoveMealItem(meal.id, item.uid)}
+                                  className="text-slate-600 hover:text-rose-400 p-0.5 cursor-pointer"
+                                  title="Remover item"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2.5 shrink-0">
-                              <span className="font-mono text-emerald-400 font-bold">{Math.round(item.calories * item.multiplier)} kcal</span>
-                              <button
-                                onClick={() => handleRemoveMealItem(meal.id, item.uid)}
-                                className="text-slate-600 hover:text-rose-400 p-0.5 cursor-pointer"
-                                title="Remover item"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
+
+                            {/* Detalhes de macros, sódio e açúcar do item */}
+                            <div className="flex items-center gap-2 text-[9px] text-slate-500 font-mono border-t border-slate-900 pt-1">
+                              <span>P: {Math.round(item.protein * item.multiplier)}g</span>
+                              <span>&middot;</span>
+                              <span>C: {Math.round(item.carbs * item.multiplier)}g</span>
+                              <span>&middot;</span>
+                              <span className="text-cyan-400">Na: {Math.round((item.sodium || 0) * item.multiplier)}mg</span>
+                              <span>&middot;</span>
+                              <span className="text-amber-400">Açúcar: {Math.round((item.sugar || 0) * item.multiplier)}g</span>
                             </div>
                           </div>
                         ))}
@@ -1214,9 +1363,13 @@ export function App() {
                     <div className="flex-1">
                       <span className="text-xs font-bold text-white block">{food.name}</span>
                       <span className="text-[10px] text-slate-400 block">{food.portion} &middot; <strong className="text-emerald-400">{food.calories} kcal</strong></span>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        P: {food.protein}g | C: {food.carbs}g | G: {food.fat}g
-                      </span>
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-mono mt-0.5">
+                        <span>P: {food.protein}g</span>
+                        <span>&middot;</span>
+                        <span className="text-cyan-400 font-bold">Na: {food.sodium || 0}mg</span>
+                        <span>&middot;</span>
+                        <span className="text-amber-400 font-bold">Açúcar: {food.sugar || 0}g</span>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -1310,7 +1463,7 @@ export function App() {
       )}
 
       {/* =========================================================================
-          MODAL: ALIMENTO PERSONALIZADO
+          MODAL: ALIMENTO PERSONALIZADO COM SÓDIO & AÇÚCAR
       ========================================================================= */}
       {isCustomFoodModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -1327,7 +1480,7 @@ export function App() {
 
             <form onSubmit={handleCreateCustomFood} className="space-y-2.5">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-0.5">Nome do Alimento</label>
+                <label className="text-[10px] text-slate-400 block mb-0.5">Nome do Alimento *</label>
                 <input
                   type="text"
                   required
@@ -1385,6 +1538,31 @@ export function App() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] text-cyan-400 block mb-0.5">Sódio (mg)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="Ex: 350"
+                    value={newFood.sodium}
+                    onChange={(e) => setNewFood({ ...newFood, sodium: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-amber-400 block mb-0.5">Açúcar (g)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="Ex: 12"
+                    value={newFood.sugar}
+                    onChange={(e) => setNewFood({ ...newFood, sugar: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="w-full py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs mt-2 cursor-pointer shadow"
@@ -1397,7 +1575,7 @@ export function App() {
       )}
 
       {/* =========================================================================
-          MODAL: DEFINIR METAS (CALORIAS & MACROS)
+          MODAL: DEFINIR METAS (CALORIAS, MACROS, SÓDIO & AÇÚCAR)
       ========================================================================= */}
       {isGoalsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -1405,7 +1583,7 @@ export function App() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Calculator className="w-4 h-4 text-emerald-400" />
-                Ajustar Metas Nutricionais
+                Ajustar Metas Nutricionais & Saúde
               </h3>
               <button onClick={() => setIsGoalsModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
@@ -1449,6 +1627,27 @@ export function App() {
                     value={goals.fat}
                     onChange={(e) => setGoals({ ...goals, fat: parseInt(e.target.value) || 0 })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+                <div>
+                  <label className="text-[9px] text-cyan-400 block mb-1">Limite Sódio (mg) [OMS: 2000]</label>
+                  <input
+                    type="number"
+                    value={goals.sodiumLimit || MAX_RECOMMENDED_SODIUM_MG}
+                    onChange={(e) => setGoals({ ...goals, sodiumLimit: parseInt(e.target.value) || 2000 })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-amber-400 block mb-1">Limite Açúcar (g) [OMS: 30]</label>
+                  <input
+                    type="number"
+                    value={goals.sugarLimit || MAX_RECOMMENDED_SUGAR_G}
+                    onChange={(e) => setGoals({ ...goals, sugarLimit: parseInt(e.target.value) || 30 })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white font-bold"
                   />
                 </div>
               </div>
