@@ -1,7 +1,7 @@
 {
-  "name": "GardenFit — Nutrição, Hidratação & Treino",
-  "short_name": "GardenFit",
-  "description": "App para controle diário de alimentação, macronutrientes (Tabela TACO), hidratação inteligente e rotina de treinos.",
+  "name": "BodyMonitor — Nutrição & Rotina Saudável",
+  "short_name": "BodyMonitor",
+  "description": "App pessoal para controle diário de alimentação, déficit calórico, hidratação inteligente, controle de café e checklist de remédios.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

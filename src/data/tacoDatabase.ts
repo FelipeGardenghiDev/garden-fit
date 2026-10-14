@@ -18,11 +18,12 @@ export interface MealFoodItem extends FoodItem {
 export interface UserStats {
   gender: 'M' | 'F';
   age: number;
-  weight: number;
-  height: number;
-  activity: string;
+  weight: number;        // 75 kg
+  targetWeight: number;  // 65 kg (meta)
+  height: number;        // 174 cm
+  activity: string;      // Fator de atividade
   objective: 'cut' | 'bulk' | 'maintain';
-  proteinPerKg: number;
+  proteinPerKg: number;  // ex: 2.0 g/kg
 }
 
 export interface DailyGoals {
@@ -32,16 +33,37 @@ export interface DailyGoals {
   fat: number;
 }
 
-export interface WorkoutSession {
+export interface MedicationItem {
+  id: string;
+  name: string;
+  dosage: string;      // ex: "1 cápsula", "50mg", "10 gotas"
+  scheduledTime: string; // ex: "08:00 - Jejum", "13:00 - Almoço", "22:00"
+  takenToday: boolean;
+  takenAt?: string;    // ex: "08:12"
+}
+
+export interface WeightEntry {
   id: string;
   date: string;
-  type: string;
-  title: string;
-  durationMinutes: number;
-  intensity: 'low' | 'moderate' | 'high';
-  caloriesBurned: number;
-  notes?: string;
+  weight: number;
 }
+
+export const INITIAL_USER_STATS: UserStats = {
+  gender: 'M',
+  age: 28,
+  weight: 75,
+  targetWeight: 65,
+  height: 174,
+  activity: '1.375', // Moderado leve
+  objective: 'cut',
+  proteinPerKg: 2.0
+};
+
+export const INITIAL_MEDICATIONS: MedicationItem[] = [
+  { id: 'med-1', name: 'Vitamina D3 / Multivitamínico', dosage: '1 cápsula', scheduledTime: '08:00 (Manhã)', takenToday: false },
+  { id: 'med-2', name: 'Creatina', dosage: '5g (1 scoop)', scheduledTime: '13:00 (Almoço)', takenToday: false },
+  { id: 'med-3', name: 'Ômega 3', dosage: '2 cápsulas', scheduledTime: '21:30 (Noite)', takenToday: false }
+];
 
 // Base de dados inicial de alimentos típicos brasileiros (baseados na Tabela TACO/IBGE)
 export const INITIAL_FOODS: FoodItem[] = [
@@ -97,31 +119,3 @@ export const MEALS_CONFIG = [
   { id: 'lanche', title: 'Lanche da Tarde', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', time: '16:00 - 17:30' },
   { id: 'jantar', title: 'Jantar', color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', time: '19:30 - 21:30' }
 ];
-
-export const PRESET_DAYS = {
-  cutting: {
-    name: 'Dia Foco em Emagrecimento',
-    meals: {
-      cafe: [
-        { uid: 'p1', foodId: 'f1', name: 'Pão Francês', portion: '1 unidade (50g)', multiplier: 1, calories: 150, protein: 4.7, carbs: 29.3, fat: 1.5, category: 'Padaria' },
-        { uid: 'p2', foodId: 'f2', name: 'Ovo de Galinha Cozido/Mexido', portion: '1 unidade média (50g)', multiplier: 2, calories: 73, protein: 6.6, carbs: 0.3, fat: 4.8, category: 'Proteínas' }
-      ],
-      almoco: [
-        { uid: 'p3', foodId: 'f19', name: 'Arroz Branco Cozido', portion: '100g (aprox. 4 col. sopa)', multiplier: 1, calories: 128, protein: 2.5, carbs: 28.1, fat: 0.2, category: 'Prato Principal' },
-        { uid: 'p4', foodId: 'f21', name: 'Feijão Carioca Cozido (50% caldo)', portion: '1 concha média (100g)', multiplier: 1, calories: 76, protein: 4.8, carbs: 13.6, fat: 0.5, category: 'Prato Principal' },
-        { uid: 'p5', foodId: 'f27', name: 'Peito de Frango Grelhado', portion: '1 filé médio (100g)', multiplier: 1.5, calories: 159, protein: 32.0, carbs: 0.0, fat: 2.5, category: 'Proteínas' },
-        { uid: 'p6', foodId: 'f32', name: 'Salada Verde (Alface, Tomate, Pepino)', portion: '1 prato cheio (100g)', multiplier: 1, calories: 18, protein: 1.0, carbs: 3.5, fat: 0.2, category: 'Vegetais' }
-      ],
-      lanche: [
-        { uid: 'p7', foodId: 'f10', name: 'Iogurte Natural Desnatado', portion: '1 pote (170g)', multiplier: 1, calories: 70, protein: 6.8, carbs: 9.8, fat: 0.3, category: 'Laticínios' },
-        { uid: 'p8', foodId: 'f13', name: 'Whey Protein Concentrado', portion: '1 scoop (30g)', multiplier: 1, calories: 120, protein: 24.0, carbs: 3.0, fat: 1.5, category: 'Suplementos' },
-        { uid: 'p9', foodId: 'f14', name: 'Banana Prata', portion: '1 unidade média (65g)', multiplier: 1, calories: 64, protein: 0.8, carbs: 16.9, fat: 0.1, category: 'Frutas' }
-      ],
-      jantar: [
-        { uid: 'p10', foodId: 'f28', name: 'Patinho Bovino Moído/Grelhado', portion: '1 porção média (100g)', multiplier: 1.2, calories: 219, protein: 35.9, carbs: 0.0, fat: 7.3, category: 'Proteínas' },
-        { uid: 'p11', foodId: 'f23', name: 'Batata Doce Cozida', portion: '100g (1 rodela grande)', multiplier: 1.5, calories: 77, protein: 0.6, carbs: 18.4, fat: 0.1, category: 'Carboidratos' },
-        { uid: 'p12', foodId: 'f34', name: 'Azeite de Oliva Extra Virgem', portion: '1 colher de sopa (10ml)', multiplier: 0.5, calories: 88, protein: 0.0, carbs: 0.0, fat: 10.0, category: 'Gorduras' }
-      ]
-    }
-  }
-};

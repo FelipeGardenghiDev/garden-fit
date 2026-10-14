@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">GardenFit</string>
-    <string name="title_activity_main">GardenFit</string>
-    <string name="package_name">dev.gardenghi.gardenfit</string>
-    <string name="custom_url_scheme">dev.gardenghi.gardenfit</string>
+    <string name="app_name">BodyMonitor</string>
+    <string name="title_activity_main">BodyMonitor</string>
+    <string name="package_name">dev.gardenghi.bodymonitor</string>
+    <string name="custom_url_scheme">dev.gardenghi.bodymonitor</string>
 </resources>

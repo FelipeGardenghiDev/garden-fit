@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'dev.gardenghi.gardenfit',
-  appName: 'GardenFit',
+  appId: 'dev.gardenghi.bodymonitor',
+  appName: 'BodyMonitor',
   webDir: 'dist',
   server: {
     androidScheme: 'https'

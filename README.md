@@ -1,82 +1,134 @@
-# 🌿 GardenFit
+# ⚡ BodyMonitor
 
-> **App Mobile (.apk nativo & PWA) para controle diário de Alimentação (Tabela TACO/IBGE & Macros), Hidratação Inteligente e Rotina de Treinos com Timer de Descanso Háptico.**
+> **App Mobile Pessoal (.apk nativo & PWA) para controle diário de Alimentação & Nutrientes (Tabela TACO), Hidratação Inteligente (2.6L), Redução de Café & Cafeína e Checklist de Remédios & Suplementos.**
 
-[![Part of GC Studio](https://img.shields.io/badge/Part%20of-GC%20Studio%20%2F%20Garden%20Apps-06B6D4?style=flat-square)](https://github.com/FelipeGardenghiDev/projeto-homestudio)
-[![Build Android APK](https://github.com/FelipeGardenghiDev/garden-fit/actions/workflows/build-apk.yml/badge.svg)](https://github.com/FelipeGardenghiDev/garden-fit/actions/workflows/build-apk.yml)
 [![Capacitor Android](https://img.shields.io/badge/Capacitor-Android%20.APK-3880FF?style=flat-square&logo=capacitor)](https://capacitorjs.com/)
 [![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind-4.0-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
-[![License](https://img.shields.io/badge/License-MIT-emerald?style=flat-square)](LICENSE)
+[![Build Android APK](https://github.com/FelipeGardenghiDev/garden-fit/actions/workflows/build-apk.yml/badge.svg)](https://github.com/FelipeGardenghiDev/garden-fit/actions/workflows/build-apk.yml)
 
 ---
 
 ## 📱 Visão Geral do App
 
-O **GardenFit** foi desenvolvido para ser o seu companheiro definitivo de bolso no celular. Concebido a partir do protótipo gerado com o **Gemini**, o app foi transformado em uma aplicação mobile completa e nativa com o **Capacitor**, permitindo gerar o arquivo **`.apk`** instalável em qualquer smartphone Android, além de funcionar como PWA offline.
+O **BodyMonitor** foi concebido sob medida para o objetivo pessoal de **perda de gordura e definição (de 75 kg para 65 kg)** com **1,74m de altura**.
+
+O app remove distrações e foca estritamente nos quatro pilares mais críticos da rotina diária:
+1. **Alimentação & Nutrientes Faltantes** (déficit calórico saudável com meta de 150g de proteína).
+2. **Hidratação Inteligente** (meta precisa de 2.625 ml/dia com base no peso corporal).
+3. **Controle e Redução de Café & Cafeína** (contador de xícaras, alertas de limite e cálculo de mg de cafeína).
+4. **Checklist Diário de Remédios e Suplementos** (horários, dosagens e marcação de confirmação com horário de tomada).
 
 ---
 
-## 🥗 1. Alimentação & Macronutrientes (Tabela TACO/IBGE)
+## 🎯 Perfil Personalizado & Metas Iniciais
 
-* **Base de Dados Brasileira Autêntica:** Mais de 35 alimentos comuns do dia a dia brasileiro (Pão francês, tapioca, cuscuz, peito de frango, patinho bovino, queijo minas, açaí, feijão carioca/preto, arroz, ovos, whey).
-* **4 Refeições Diárias:** Café da Manhã, Almoço, Lanche da Tarde e Jantar com horários recomendados e soma independente de macros.
-* **Multiplicadores de Porção:** Adicione 0.5x, 1x, 1.5x, 2x ou 3x a porção padrão de referência.
-* **Cadastro de Alimentos Customizados:** Adicione receitas caseiras, shakes ou marmitas com cálculo calórico automático.
-* **Cálculo Científico de Metas (Mifflin-St Jeor):**
-  * Estimativa da Taxa Metabólica Basal (TMB) e Gasto Energético Total (TDEE).
-  * Ajuste automático para **Definição / Emagrecimento (-450 kcal)**, **Manutenção** ou **Hipertrofia / Ganho de Massa (+350 kcal)**.
-  * Meta de proteína ajustável por kg corporal (ex: 2.0g/kg).
-
----
-
-## 💧 2. Hidratação Inteligente
-
-* **Meta Calculada por Peso:** Cálculo automático de ingestão hídrica ($35\text{ ml} \times \text{peso corporal em kg}$).
-* **Adição Rápida com 1 Toque:** Botões dedicados para +200ml (copo pequeno), +300ml (copo cheio), +500ml (garrafinha) e +1.000ml (squeeze).
-* **Animação de Preenchimento:** Visualizador circular de hidratação com feedback visual em tempo real e comemoração em confetes ao bater a meta do dia.
+| Parâmetro | Configuração Inicial | Objetivo |
+| :--- | :--- | :--- |
+| **Altura** | 1,74 m (174 cm) | Constante |
+| **Peso Atual** | 75,0 kg | Ponto de partida |
+| **Meta de Peso** | 65,0 kg | **-10,0 kg** de gordura |
+| **Déficit Calórico** | ~1.850 kcal/dia | Perda de gordura sustentável sem perder massa magra |
+| **Meta Proteica** | 150 g/dia (2.0g por kg) | Preservação de massa muscular |
+| **Meta de Água** | 2.625 ml/dia | $75\text{ kg} \times 35\text{ ml}$ |
+| **Limite de Café** | 3 xícaras/dia (~240mg cafeína) | Redução gradual de consumo excessivo |
 
 ---
 
-## 🏋️‍♂️ 3. Exercícios Físicos & Rotina de Treinos
+## 🚀 Funcionalidades Principais
 
-* **Registro de Atividades:** Musculação (Hipertrofia/Força), Corrida na esteira/rua, Caminhada, Ciclismo, Pular Corda, Natação, Lutas (Boxe/Muay Thai) e Alongamento/Yoga.
-* **Cálculo Fisiológico de Queima Calórica (MET):** Estimativa com base no equivalente metabólico da tarefa e peso corporal.
-* **Balanço Calórico Líquido:**
-  $$\text{Calorias Líquidas} = \text{Calorias Consumidas} - \text{Calorias Queimadas nos Treinos}$$
-* **Cronômetro de Descanso entre Séries (Gym Rest Timer):**
-  * Presets rápidos de 30s, 45s, 60s, 90s e 120s.
-  * Alerta sonoro via Web Audio API e **vibração háptica no celular** (`navigator.vibrate`) quando o tempo de descanso zerar!
+### 1. 🍽️ Nutrientes & "O Que Está Faltando Hoje"
+- **Monitor de Gaps Nutricionais em Tempo Real:** Um card no topo indica exatamente quantas **calorias, proteínas, carboidratos e gorduras ainda faltam** ingerir para bater as metas do dia.
+- **Tabela TACO/IBGE Integrada:** Banco de dados brasileiro com mais de 35 alimentos comuns (pão francês, ovo cozido/mexido, tapioca, cuscuz, peito de frango, patinho bovino, queijo minas, arroz, feijão, aveia, whey protein).
+- **Multiplicadores de Porção:** 0.5x, 1x, 1.5x, 2x ou 3x a porção de referência.
+- **Alimentos Personalizados:** Cadastro rápido de marmitas, receitas ou suplementos específicos com cálculo calórico instantâneo.
+- **Divisão por Refeições:** Café da Manhã, Almoço, Lanche da Tarde e Jantar.
+
+### 2. 💧 Hidratação & ☕ Monitor de Café
+- **Hidratação Calculada por Peso:** Meta de 2.6L com botões rápidos de 1 toque:
+  - `+200ml` (Copo americano)
+  - `+300ml` (Copo cheio)
+  - `+500ml` (Garrafinha)
+  - `+1.000ml` (Squeeze grande)
+- **Efeito Confetti:** Comemoração animada na tela ao completar os 2.6L do dia.
+- **Monitor de Café para Redução de Consumo:**
+  - Contador rápido de xícaras com botão de incremento e decremento.
+  - Estimativa de cafeína consumida (~80mg por xícara).
+  - Horário da última xícara registrada (ex: *"Último café às 15:40"*).
+  - Alertas visuais automáticos:
+    - 🟢 **Verde:** Consumo moderado dentro da meta.
+    - 🟡 **Amarelo:** Limite atingido (ex: 3 xícaras).
+    - 🔴 **Vermelho:** Alerta de excesso (ex: 4+ xícaras).
+
+### 3. 💊 Checklist Diário de Remédios & Suplementos
+- **Checklist com Toque Fácil:** Checkboxes largos com feedback visual.
+- **Registro do Horário Tomado:** Ao marcar o remédio, o app registra automaticamente a hora em que foi consumido (ex: *"Tomado às 08:14"*).
+- **Cadastro de Medicamentos:** Adicione remédios ou suplementos com nome, dosagem (ex: "1 cápsula", "50mg") e horário previsto (ex: "08:00 - Jejum").
+- **Botão "Resetar para Amanhã":** Desmarca todos os itens de uma vez para iniciar um novo dia sem perder as configurações dos remédios cadastrados.
+
+### 4. ⚖️ Meta 65kg & Backup de Dados
+- **Barra de Progresso Visual:** Mostra a porcentagem exata percorrida de 75 kg rumo aos 65 kg e quantos quilos faltam.
+- **Histórico de Pesagens:** Registre pesagens periódicas para acompanhar o ritmo da perda de peso.
+- **Backup e Restauração 1-Click (JSON):**
+  - **Exportar Backup:** Baixa um arquivo `.json` com todos os seus dados (refeições, histórico de peso, remédios, configurações).
+  - **Importar Backup:** Restaura instantaneamente o histórico em qualquer outro celular ou navegador.
 
 ---
 
-## 📦 Como Gerar e Baixar o Arquivo `.apk` para o Celular
+## 💾 Como os Dados São Armazenados no APK? Já Está Funcionando?
 
-### Opção A: Download Automático via GitHub Actions (Sem instalar nada no PC!) 🚀
+**Sim, está 100% funcionando!**
+
+### Como funciona internamente:
+Quando o app é executado no Android como um aplicativo nativo (`.apk`), o Capacitor utiliza o motor nativo do **Android WebView (Chromium Sandboxed Storage)**. 
+- O `localStorage` e `IndexedDB` são persistidos diretamente no sistema de arquivos do Android dentro da pasta privada e protegida do aplicativo:
+  ```
+  /data/data/dev.gardenghi.bodymonitor/app_webview/Default/Local Storage/
+  ```
+- **Persistência Permanente:** Os dados permanecem gravados mesmo se você fechar o app, forçar o encerramento no gerenciador de tarefas do Android ou reiniciar o smartphone.
+- **Privacidade Total:** Os dados nunca saem do seu aparelho; nenhum servidor externo tem acesso aos seus registros de saúde ou rotina.
+- **Segurança Adicional:** Foi incluído o recurso de **Backup em 1 Clique (Exportar/Importar JSON)** na aba "Meta 65kg", permitindo que você salve uma cópia de segurança dos seus dados sempre que desejar.
+
+---
+
+## 🧪 Como Testar Agora no PC e no Celular via Wi-Fi
+
+O servidor de desenvolvimento do Vite já está configurado e rodando:
+
+### 1. No Computador (Navegador):
+Abra no navegador:
+```
+http://localhost:5174/
+```
+*(Dica: Abra as Ferramentas do Desenvolvedor com `F12` e ative o "Device Mode" com `Ctrl+Shift+M` para simular a tela do celular).*
+
+### 2. No Celular (Conectado no mesmo Wi-Fi de casa):
+Abra o navegador do celular (Chrome ou Safari) e acesse:
+```
+http://192.168.102.114:5174/
+```
+Você verá o app funcionando em tempo real com animações fluidas e layout mobile nativo.
+
+---
+
+## 📦 Como Gerar e Baixar o `.apk` para o Celular
+
+### Opção 1: Download Automático via GitHub Actions (Recomendado) 🚀
 1. Acesse a aba **[Actions do repositório](https://github.com/FelipeGardenghiDev/garden-fit/actions)**.
-2. Clique no workflow **Build Android APK** mais recente.
-3. No final da página em **Artifacts**, baixe o arquivo comprimido contendo o **`app-debug.apk`**.
-4. Envie o `.apk` para o seu celular (via WhatsApp, Telegram ou Google Drive) e toque nele para instalar!
+2. O workflow **Build Android APK** compila o aplicativo na nuvem.
+3. No final da execução, em **Artifacts**, faça o download do pacote contendo o **`app-debug.apk`**.
+4. Transfira o `.apk` para o celular e instale com 1 toque.
 
-### Opção B: Instalar como PWA no Celular (Sem precisar de APK)
-1. Acesse o endereço web do app no navegador do celular (Chrome).
-2. Toque no menu de 3 pontinhos do Chrome e selecione **"Adicionar à Tela Inicial"** ou **"Instalar Aplicativo"**.
-3. O app criará um ícone nativo na tela do celular e abrirá em tela cheia sem barras de navegador.
-
-### Opção C: Gerar localmente via Android Studio
+### Opção 2: Gerar Localmente via Android Studio
 ```bash
-# 1. Instalar dependências
-npm install
-
-# 2. Compilar assets web
+# 1. Compilar os arquivos da interface
 npm run build
 
-# 3. Sincronizar o projeto nativo do Android
-npx cap add android
+# 2. Sincronizar os assets nativos do Android
 npx cap sync android
 
-# 4. Abrir no Android Studio para gerar o APK
+# 3. Abrir o projeto no Android Studio e compilar o APK
 npx cap open android
 ```
 
@@ -84,24 +136,16 @@ npx cap open android
 
 ## 🛠️ Stack Tecnológica
 
-* **Framework UI:** React 19 + TypeScript + Vite 8
-* **Estilização:** Tailwind CSS v4 (Design Mobile Dark & Safe Areas)
+* **Interface:** React 19 + TypeScript + Vite 8
+* **Estilização:** Tailwind CSS v4 (Dark Theme & Safe Areas móveis)
 * **Mobile Runtime:** Capacitor 7 Android
-* **Áudio & Vibração:** Web Audio API + HTML5 Vibration API
-* **Persistência:** LocalStorage com sincronização automática e proteção de dados
-* **CI/CD:** GitHub Actions com Ubuntu Runner, Java 21 Temurin e Android SDK
-
----
-
-## 🌿 Ecossistema GC Studio
-
-O **GardenFit** integra a suíte de aplicativos autorais e ferramentas criativas do **GC Studio** (Felipe Gardenghi).  
-Conheça outros projetos da suíte:
-* 🎬 **[GardenCut](https://github.com/FelipeGardenghiDev/garden-cut):** Editor e estúdio de vídeo não-linear web.
-* 🎨 **[Garden Pixel Editor](https://github.com/FelipeGardenghiDev/garden-pixel-editor):** Editor de pixel art e isometria 2:1.
-* 🏛️ **[GC Studio Hub](https://github.com/FelipeGardenghiDev/projeto-homestudio):** Central oficial do estúdio.
+* **Ícones:** Lucide React
+* **Efeitos Visuais:** Canvas Confetti
+* **Linter:** Oxlint (0 erros, 0 warnings)
+* **Armazenamento:** LocalStorage Sandboxed no Android WebView + Export/Import JSON
 
 ---
 
 ## 📄 Licença
-Distribuído sob a licença MIT. Desenvolvido por Felipe Gardenghi.
+
+Uso pessoal exclusivo — Felipe Gardenghi.
