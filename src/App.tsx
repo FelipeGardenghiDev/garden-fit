@@ -22,13 +22,13 @@ import {
   WeightEntry
 } from './data/tacoDatabase';
 
-const STORAGE_VERSION_TAG = 'bodymonitor_routine_v4';
+const STORAGE_VERSION_TAG = 'bodymonitor_routine_v5';
 
 export function App() {
-  // Garantir migração inicial para a nova rotina personalizada com Sódio e Açúcar
+  // Garantir migração inicial para a nova rotina personalizada com novos itens (fast food e bebidas)
   if (typeof window !== 'undefined') {
-    const isV4 = localStorage.getItem(STORAGE_VERSION_TAG) === 'true';
-    if (!isV4) {
+    const isV5 = localStorage.getItem(STORAGE_VERSION_TAG) === 'true';
+    if (!isV5) {
       localStorage.setItem('bodymonitor_foods', JSON.stringify(INITIAL_FOODS));
       localStorage.setItem('bodymonitor_meds', JSON.stringify(INITIAL_MEDICATIONS));
       localStorage.setItem('bodymonitor_goals', JSON.stringify({

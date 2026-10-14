@@ -83,6 +83,7 @@ export const INITIAL_MEDICATIONS: MedicationItem[] = [
 
 // Lista exclusiva de alimentos da rotina do Felipe com Sódio (mg) e Açúcar (g)
 export const INITIAL_FOODS: FoodItem[] = [
+  // Rotina Café / Lanches
   {
     id: 'food-leite-nescau',
     name: 'Leite semidesnatado com Nescau',
@@ -93,6 +94,30 @@ export const INITIAL_FOODS: FoodItem[] = [
     fat: 3.2,
     sodium: 130, // 100mg leite + 30mg Nescau
     sugar: 25.0, // 15g Nescau adicionado + 10g lactose
+    category: 'Bebidas'
+  },
+  {
+    id: 'food-coca-zero-pepsi-black',
+    name: 'Coca-Cola Zero / Pepsi Black',
+    portion: '1 lata (350ml)',
+    calories: 0,
+    protein: 0.0,
+    carbs: 0.0,
+    fat: 0.0,
+    sodium: 49,
+    sugar: 0.0,
+    category: 'Bebidas'
+  },
+  {
+    id: 'food-guarana-tradicional',
+    name: 'Guaraná Antarctica (Tradicional)',
+    portion: '1 lata (350ml)',
+    calories: 140,
+    protein: 0.0,
+    carbs: 35.0,
+    fat: 0.0,
+    sodium: 21,
+    sugar: 35.0, // 35g de açúcar livre!
     category: 'Bebidas'
   },
   {
@@ -154,6 +179,44 @@ export const INITIAL_FOODS: FoodItem[] = [
     sodium: 1550, // 1.550 mg de sódio no pacote c/ tempero!
     sugar: 4.0,
     category: 'Refeições Rápidas'
+  },
+
+  // Fast Food & Lanches Especiais
+  {
+    id: 'food-cheddar-mcmelt',
+    name: 'Cheddar McMelt (McDonald\'s)',
+    portion: '1 sanduíche (218g)',
+    calories: 568,
+    protein: 31.0,
+    carbs: 34.0,
+    fat: 34.0,
+    sodium: 1077, // Rico em sódio pelo queijo cheddar e shoyu
+    sugar: 8.0,
+    category: 'Fast Food'
+  },
+  {
+    id: 'food-big-mac',
+    name: 'Big Mac (McDonald\'s)',
+    portion: '1 sanduíche (210g)',
+    calories: 503,
+    protein: 27.0,
+    carbs: 45.0,
+    fat: 24.0,
+    sodium: 843,
+    sugar: 8.5,
+    category: 'Fast Food'
+  },
+  {
+    id: 'food-batata-media-fastfood',
+    name: 'Batata Frita Média (McDonald\'s / Burger King)',
+    portion: '1 porção média (~100g)',
+    calories: 295,
+    protein: 4.0,
+    carbs: 38.0,
+    fat: 14.5,
+    sodium: 225,
+    sugar: 0.3,
+    category: 'Fast Food'
   }
 ];
 
