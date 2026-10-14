@@ -1,0 +1,18 @@
+{
+  "name": "GardenFit — Nutrição, Hidratação & Treino",
+  "short_name": "GardenFit",
+  "description": "App para controle diário de alimentação, macronutrientes (Tabela TACO), hidratação inteligente e rotina de treinos.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
