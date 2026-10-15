@@ -6,7 +6,7 @@
 [![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind-4.0-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
-[![Build Android APK](https://github.com/FelipeGardenghiDev/garden-fit/actions/workflows/build-apk.yml/badge.svg)](https://github.com/FelipeGardenghiDev/garden-fit/actions/workflows/build-apk.yml)
+[![Build Android APK](https://github.com/FelipeGardenghiDev/body-monitor/actions/workflows/build-apk.yml/badge.svg)](https://github.com/FelipeGardenghiDev/body-monitor/actions/workflows/build-apk.yml)
 
 ---
 
@@ -115,7 +115,7 @@ Você verá o app funcionando em tempo real com animações fluidas e layout mob
 ## 📦 Como Gerar e Baixar o `.apk` para o Celular
 
 ### Opção 1: Download Automático via GitHub Actions (Recomendado) 🚀
-1. Acesse a aba **[Actions do repositório](https://github.com/FelipeGardenghiDev/garden-fit/actions)**.
+1. Acesse a aba **[Actions do repositório](https://github.com/FelipeGardenghiDev/body-monitor/actions)**.
 2. O workflow **Build Android APK** compila o aplicativo na nuvem.
 3. No final da execução, em **Artifacts**, faça o download do pacote contendo o **`app-debug.apk`**.
 4. Transfira o `.apk` para o celular e instale com 1 toque.
